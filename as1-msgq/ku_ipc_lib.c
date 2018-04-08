@@ -11,8 +11,10 @@ int ku_msgget(int key, int msgflg) {
 
 	int dev = open("/dev/ku_ipc_dev", O_RDWR);
 	printf("what are you doin %d\n", dev);
-	ioctl(dev, IOCTL_MSGGET, &msgget_arg);
+	int result = ioctl(dev, IOCTL_MSGGET, &msgget_arg);
 	close(dev);
+
+	return result;
 }
 
 int ku_msgclose(int msqid) {
@@ -21,34 +23,40 @@ int ku_msgclose(int msqid) {
 	};
 
 	int dev = open("/dev/ku_ipc_dev", O_RDWR);
-	ioctl(dev, IOCTL_MSGCLOSE, &msgclose_arg);
+	int result = ioctl(dev, IOCTL_MSGCLOSE, &msgclose_arg);
 	close(dev);
+
+	return result;
 }
 
 int ku_msgsnd(int msqid, void *msgp, int msgsz, int msgflg) {
 	struct msgsnd_str msgsnd_arg = {
-		.msqid = msqid,
 		.msgp = msgp,
+		.msqid = msqid,
 		.msgsz = msgsz,
 		.msgflg = msgflg,
 	};
 
 	int dev = open("/dev/ku_ipc_dev", O_RDWR);
-	ioctl(dev, IOCTL_MSGSND, &msgsnd_arg);
+	int result = write(dev, (char*)&msgsnd_arg, msgsz);
 	close(dev);
+
+	return result;
 }
 
 int ku_msgrcv(int msqid, void *msgp, int msgsz, long msgtype, int msgflg) {
 	struct msgrcv_str msgrcv_arg = {
 		.msqid = msqid,
-		.msgp = msgp,
 		.msgsz = msgsz,
 		.msgtype = msgtype,
 		.msgflg = msgflg,
 	};
 
 	int dev = open("/dev/ku_ipc_dev", O_RDWR);
-	ioctl(dev, IOCTL_MSGRCV, &msgrcv_arg);
+	read(dev, msgp, msgsz);
+	int result = ioctl(dev, IOCTL_MSGRCV, &msgrcv_arg);
 	close(dev);
+
+	return result;
 }
 

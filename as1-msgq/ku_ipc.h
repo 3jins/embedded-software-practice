@@ -2,7 +2,7 @@
 #define __KU_IPC_H__
 
 #define KUIPC_MAXMSG 1024
-#define KUIPC_MAXVOL 8
+#define KUIPC_MAXVOL 128 
 #define IPC_CREAT 00001000
 #define IPC_EXCL 00002000
 #define IPC_NOWAIT 00004000
@@ -27,14 +27,13 @@ struct msgclose_str {
 	int msqid;
 };
 struct msgsnd_str {
-	int msqid;
 	void *msgp;
+	int msqid;
 	int msgsz;
 	int msgflg;
 };
 struct msgrcv_str {
 	int msqid;
-	void *msgp;
 	int msgsz;
 	int msgtype;
 	int msgflg;

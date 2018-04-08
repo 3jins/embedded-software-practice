@@ -1,0 +1,1 @@
+arm-linux-gnueabi-gcc -o writer ku_ipc_writer.c
