@@ -1,0 +1,1 @@
+~/rp/rp-kernel/scppi.sh ch/ch3-led_sensor led_sensor.ko led_sensor_app mknod.sh
