@@ -24,9 +24,9 @@ struct ku_pir_data {
 	char rf_flag;
 };
 
-struct ioctl_insert_arg {
-	int fd; 
-	struct ku_pir_data *pir_data;
+struct ioctl_read_arg {
+	struct ku_pir_data *data;
+	int fd;
 };
 
 long fds[MAX_FD];

@@ -16,7 +16,10 @@
 MODULE_LICENSE("GPL");
 
 int i, j = 0;
-//struct ku_pir_data_list pir_list;
+struct ku_pir_data kernel_data;
+
+spinlock_t ku_pir_lock;
+wait_queue_head_t ku_pir_wq;
 
 void init_fds(void) {
 	int max_fd = sizeof(fds) / sizeof(int);
@@ -58,6 +61,32 @@ int close(int fd) {
 	}
 }
 
+int insertData(struct ku_pir_data *arg) {
+	int max_fd = sizeof(fds) / sizeof(int);
+	struct ku_pir_data data = *arg;
+//	int ret = copy_from_user(&data, (struct ku_pir_data *)arg, sizeof(struct ku_pir_data));		// IS IT NECESSARY?
+
+	for(i = 0; i < max_fd; i++) {
+		struct ku_pir_data_list data_list;
+		struct ku_pir_data_list *new_data;
+
+		if(fds[i] == 0) continue;
+
+		data_list = *(struct ku_pir_data_list*)fds[i];
+		new_data = (struct ku_pir_data_list*)kmalloc(sizeof(struct ku_pir_data_list), GFP_KERNEL);
+		new_data->data = data;
+
+		spin_lock(&ku_pir_lock);
+		list_add_tail(&new_data->list, &data_list.list);
+		spin_unlock(&ku_pir_lock);
+
+		wake_up_interruptible(&ku_pir_wq);
+	}
+
+//	return ret;
+	return 0;
+}
+
 static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 	long ret = 0L;
 
@@ -73,6 +102,7 @@ static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case KU_IOCTL_FLUSH:
 			break;
 		case KU_IOCTL_INSERT:
+			ret = insertData((struct ku_pir_data *) arg);
 			break;
 		default:
 			break;

@@ -45,6 +45,10 @@ int ku_pir_insertData(int fd, long unsigned int ts, char rf_flag) {
 	int dev = open("/dev/ku_pir_dev", O_RDWR);
 	int ret = -1;
 
+	struct ku_pir_data data = {
+
+	};
+
 	ret = ioctl(dev, KU_IOCTL_INSERT, NULL);
 
 	close(dev);
