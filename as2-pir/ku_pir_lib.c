@@ -19,7 +19,7 @@ int ku_pir_close(int fd) {
 	int dev = open("/dev/ku_pir_dev", O_RDWR);
 	int ret = -1;
 
-	ret = ioctl(dev, KU_IOCTL_CLOSE, NULL);
+	ret = ioctl(dev, KU_IOCTL_CLOSE, &fd);
 
 	close(dev);
 	return ret;

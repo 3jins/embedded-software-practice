@@ -46,6 +46,18 @@ int open(void) {
 	return -1;
 }
 
+int close(int fd) {
+	int max_fd = sizeof(fds) / sizeof(int);
+	if(max_fd < fd || fds[fd] == 0) {
+		printk("There is no fd %d", fd);
+		return -1;
+	}
+	else {
+		fds[fd] = 0;
+		return 0;
+	}
+}
+
 static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 	long ret = 0L;
 
@@ -54,6 +66,7 @@ static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = open();
 			break;
 		case KU_IOCTL_CLOSE:
+			ret = close(*(int *)arg);
 			break;
 		case KU_IOCTL_READ:
 			break;
