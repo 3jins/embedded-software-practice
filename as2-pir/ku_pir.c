@@ -66,32 +66,6 @@ int close(int fd) {
 	}
 }
 
-int insertData(struct ku_pir_data *arg) {
-	int max_fd = sizeof(data_queue_list) / sizeof(int);
-	struct ku_pir_data data = *arg;
-	//	int ret = copy_from_user(&data, (struct ku_pir_data *)arg, sizeof(struct ku_pir_data));		// IS IT NECESSARY?
-
-	for(i = 0; i < max_fd; i++) {
-		struct ku_pir_data_list data_list;
-		struct ku_pir_data_list *new_data;
-
-		if(data_queue_list[i] == 0) continue;
-
-		data_list = *(struct ku_pir_data_list*)data_queue_list[i];
-		new_data = (struct ku_pir_data_list*)kmalloc(sizeof(struct ku_pir_data_list), GFP_KERNEL);
-		new_data->data = data;
-
-		spin_lock(&ku_pir_lock);
-		list_add_tail(&new_data->list, &data_list.list);
-		spin_unlock(&ku_pir_lock);
-
-		wake_up_interruptible(&ku_pir_wq);
-	}
-
-	//	return ret;
-	return 0;
-}
-
 int get_queue_size(int fd) {
 	struct ku_pir_data_list *data_list = (struct ku_pir_data_list *)data_queue_list[i];
 	struct ku_pir_data_list *tmp = 0;
@@ -143,6 +117,47 @@ void read(struct ioctl_read_arg *arg) {
 	linked_list_pop((struct ku_pir_data_list *)data_queue_list[fd], arg->data);	
 }
 
+int insertData(struct ku_pir_data *arg) {
+	int max_fd = sizeof(data_queue_list) / sizeof(int);
+	struct ku_pir_data data = *arg;
+	//	int ret = copy_from_user(&data, (struct ku_pir_data *)arg, sizeof(struct ku_pir_data));		// IS IT NECESSARY?
+
+	for(i = 0; i < max_fd; i++) {
+		struct ku_pir_data_list data_list;
+		struct ku_pir_data_list *new_data;
+
+		if(data_queue_list[i] == 0) continue;
+
+		data_list = *(struct ku_pir_data_list*)data_queue_list[i];
+		new_data = (struct ku_pir_data_list*)kmalloc(sizeof(struct ku_pir_data_list), GFP_KERNEL);
+		new_data->data = data;
+
+		spin_lock(&ku_pir_lock);
+		list_add_tail(&new_data->list, &data_list.list);
+		spin_unlock(&ku_pir_lock);
+
+		wake_up_interruptible(&ku_pir_wq);
+	}
+
+	//	return ret;
+	return 0;
+}
+
+void flush(int fd) {
+	struct ku_pir_data_list *tmp = 0;
+	struct ku_pir_data_list *data_list = data_queue_list[fd];
+	struct list_head *pos = 0;
+	struct list_head *q = 0;
+
+	spin_lock(&ku_pir_lock);
+	list_for_each_safe(pos, q, &data_list->list){
+		tmp = list_entry(pos, struct ku_pir_data_list, list);
+		list_del(pos);
+		kfree(tmp);
+	}
+	spin_unlock(&ku_pir_lock);
+}
+
 static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 	long ret = 0L;
 
@@ -157,6 +172,7 @@ static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			read((struct ioctl_read_arg *) arg);
 			break;
 		case KU_IOCTL_FLUSH:
+			flush(*(int *)arg);	
 			break;
 		case KU_IOCTL_INSERT:
 			ret = insertData((struct ku_pir_data *) arg);

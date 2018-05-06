@@ -40,7 +40,7 @@ void ku_pir_read(int fd, struct ku_pir_data *data) {
 void ku_pir_flush(int fd) {
 	int dev = open("/dev/ku_pir_dev", O_RDWR);
 
-	ioctl(dev, KU_IOCTL_FLUSH, NULL);
+	ioctl(dev, KU_IOCTL_FLUSH, &fd);
 
 	close(dev);
 }
