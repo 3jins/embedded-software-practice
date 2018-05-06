@@ -27,8 +27,12 @@ int ku_pir_close(int fd) {
 
 void ku_pir_read(int fd, struct ku_pir_data *data) {
 	int dev = open("/dev/ku_pir_dev", O_RDWR);
+	struct ioctl_read_arg arg = {
+		.ku_pir_data = data,
+		.fd = fd,
+	};
 
-	ioctl(dev, KU_IOCTL_READ, NULL);
+	ioctl(dev, KU_IOCTL_READ, &arg);
 
 	close(dev);
 }
