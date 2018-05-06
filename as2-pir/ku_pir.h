@@ -9,6 +9,8 @@
 #define IOCTL_NUM4 IOCTL_START_NUM+4
 #define IOCTL_NUM5 IOCTL_START_NUM+5
 
+#define MAX_FD 100
+
 #define SIMPLE_IOCTL_NUM 'z'
 #define	KU_IOCTL_OPEN	_IOWR(SIMPLE_IOCTL_NUM, IOCTL_NUM1, unsigned long *)
 #define	KU_IOCTL_CLOSE	_IOWR(SIMPLE_IOCTL_NUM, IOCTL_NUM2, unsigned long *)
@@ -21,6 +23,12 @@ struct ku_pir_data {
 	long unsigned int timestamp;
 	char rf_flag;
 };
+
+struct ioctl_data {
+
+};
+
+long fds[MAX_FD];
 
 struct ku_pir_data_list {
 	struct list_head list;

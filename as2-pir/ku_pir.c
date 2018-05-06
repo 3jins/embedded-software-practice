@@ -15,27 +15,51 @@
 
 MODULE_LICENSE("GPL");
 
-struct ku_pir_data_list pir_list;
+int i, j = 0;
+//struct ku_pir_data_list pir_list;
 
-static int ku_pir_open(struct inode *inode, struct file* file) { return 0; }
+void init_fds(void) {
+	int max_fd = sizeof(fds) / sizeof(int);
+	for(i = 0; i < max_fd; i++) {
+		fds[i] = 0L;
+	}
+}
+
+static int ku_pir_open(struct inode *inode, struct file* file) { 
+	init_fds();
+	return 0; 
+}
+
 static int ku_pir_release(struct inode *inode, struct file* file) { return 0; }
 
+int open(void) {
+	int max_fd = sizeof(fds) / sizeof(int);
+	for(i = 0; i < max_fd; i++) {
+		if (fds[i] == 0) {
+			// init a queue
+			struct ku_pir_data_list data_list;
+			INIT_LIST_HEAD(&data_list.list);
+			fds[i] = &data_list;
+			return i;
+		}
+	}
+	return -1;
+}
 
 static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
-	long ret;
-
-	ret = 0L;
+	long ret = 0L;
 
 	switch(cmd){
-		case KU_IOCTL_INSERT:
-			break;
-		case KU_IOCTL_READ:
-			break;
 		case KU_IOCTL_OPEN:
+			ret = open();
 			break;
 		case KU_IOCTL_CLOSE:
 			break;
+		case KU_IOCTL_READ:
+			break;
 		case KU_IOCTL_FLUSH:
+			break;
+		case KU_IOCTL_INSERT:
 			break;
 		default:
 			break;
