@@ -47,7 +47,7 @@ int open(void) {
 			// init a queue
 			struct ku_pir_data_list data_list;
 			INIT_LIST_HEAD(&data_list.list);
-			data_queue_list[i] = &data_list;
+			data_queue_list[i] = (long)&data_list;
 			return i;
 		}
 	}
@@ -145,7 +145,7 @@ int insertData(struct ku_pir_data *arg) {
 
 void flush(int fd) {
 	struct ku_pir_data_list *tmp = 0;
-	struct ku_pir_data_list *data_list = data_queue_list[fd];
+	struct ku_pir_data_list *data_list = (struct ku_pir_data_list *)data_queue_list[fd];
 	struct list_head *pos = 0;
 	struct list_head *q = 0;
 
