@@ -17,6 +17,11 @@ MODULE_LICENSE("GPL");
 
 int i, j = 0;
 struct ku_pir_data kernel_data;
+struct ku_pir_data_list {
+	struct list_head list;
+	struct ku_pir_data data;
+	int fd;
+};
 
 spinlock_t ku_pir_lock;
 wait_queue_head_t ku_pir_wq;

@@ -30,9 +30,3 @@ struct ioctl_read_arg {
 };
 
 long data_queue_list[MAX_FD];
-
-struct ku_pir_data_list {
-	struct list_head list;
-	struct ku_pir_data data;
-	int fd;
-};
