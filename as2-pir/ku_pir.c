@@ -28,17 +28,14 @@ wait_queue_head_t ku_pir_wq;
 
 static int irq_num;
 
-void init_fds(void) {
+void init_data_queue_list(void) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 	for(i = 0; i < max_fd; i++) {
 		data_queue_list[i] = 0L;
 	}
 }
 
-static int ku_pir_open(struct inode *inode, struct file* file) { 
-	init_fds();
-	return 0; 
-}
+static int ku_pir_open(struct inode *inode, struct file* file) { return 0; }
 
 static int ku_pir_release(struct inode *inode, struct file* file) { return 0; }
 
@@ -49,8 +46,10 @@ int open(void) {
 			// init a queue
 			struct ku_pir_data_list data_list;
 			INIT_LIST_HEAD(&data_list.list);
+
+			spin_lock(&ku_pir_lock);	
 			data_queue_list[i] = (long)&data_list;
-			printk("%d %d", i, data_queue_list[i]);
+			spin_unlock(&ku_pir_lock);
 			return i;
 		}
 	}
@@ -59,17 +58,20 @@ int open(void) {
 
 int close(int fd) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
+	int ret = -1;
+
+	spin_lock(&ku_pir_lock);
 	if(max_fd < fd || data_queue_list[fd] == 0) {
-		printk("%d", max_fd);
-		printk("%d", fd);
-		printk("%d", data_queue_list[fd]);
 		printk("[close] There is no fd %d", fd);
-		return -1;
+		ret = -1;
 	}
 	else {
 		data_queue_list[fd] = 0;
-		return 0;
+		ret = 0;
 	}
+	spin_unlock(&ku_pir_lock);
+
+	return ret;
 }
 
 int get_queue_size(int fd) {
@@ -204,6 +206,9 @@ static int __init ku_pir_init(void){
 	int ret;
 
 	printk("Init Module\n");
+
+	/* Initialize data_queue_list */
+	init_data_queue_list();
 
 	/* Allocate character device */
 	alloc_chrdev_region(&dev_num, 0, 1, DEV_NAME);
