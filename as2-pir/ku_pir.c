@@ -50,6 +50,7 @@ int open(void) {
 			struct ku_pir_data_list data_list;
 			INIT_LIST_HEAD(&data_list.list);
 			data_queue_list[i] = (long)&data_list;
+			printk("%d %d", i, data_queue_list[i]);
 			return i;
 		}
 	}
@@ -59,7 +60,10 @@ int open(void) {
 int close(int fd) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 	if(max_fd < fd || data_queue_list[fd] == 0) {
-		printk("There is no fd %d", fd);
+		printk("%d", max_fd);
+		printk("%d", fd);
+		printk("%d", data_queue_list[fd]);
+		printk("[close] There is no fd %d", fd);
 		return -1;
 	}
 	else {
@@ -93,7 +97,7 @@ void linked_list_pop(struct ku_pir_data_list * mylist, struct ku_pir_data* poppe
 		tmp = list_entry(pos, struct ku_pir_data_list, list);
 		ctu_result = copy_to_user(popped_data, &tmp->data, sizeof(struct ku_pir_data));
 		if(ctu_result < 0) {
-			printk("Failed copy_to_user");
+			printk("[linked_list_pop] Failed copy_to_user");
 			return;
 		}
 		list_del(pos);
@@ -108,13 +112,13 @@ void read(struct ioctl_read_arg *arg) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 
 	if(max_fd < fd || data_queue_list[fd] == 0) {
-		printk("There is no fd %d", fd);
+		printk("[read] There is no fd %d", fd);
 		return;
 	}
 
-	printk("fd %d is waiting...", fd);
+	printk("[read] fd %d is waiting...", fd);
 	wait_event_interruptible(ku_pir_wq, (get_queue_size(fd) > 0));
-	printk("fd %d woke up!", fd);
+	printk("[read] fd %d woke up!", fd);
 
 	linked_list_pop((struct ku_pir_data_list *)data_queue_list[fd], arg->data);	
 }
@@ -208,7 +212,7 @@ static int __init ku_pir_init(void){
 	ret = cdev_add(cd_cdev, dev_num, 1);
 
 	if(ret<0){
-		printk("Fail to add a character device\n");
+		printk("[init] Fail to add a character device\n");
 		return -1;
 	}
 
@@ -237,7 +241,7 @@ static void __exit ku_pir_exit(void){
 	struct list_head *pos = 0;
 	struct list_head *q = 0;
 
-	printk("Exit Module \n");
+	printk("Exit Module\n");
 
 //	list_for_each_safe(pos, q, &kern_queues.list){
 //		tmp = list_entry(pos, struct queues, list);
