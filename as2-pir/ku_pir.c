@@ -26,6 +26,8 @@ struct ku_pir_data_list {
 spinlock_t ku_pir_lock;
 wait_queue_head_t ku_pir_wq;
 
+static int irq_num;
+
 void init_fds(void) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 	for(i = 0; i < max_fd; i++) {
@@ -190,3 +192,66 @@ struct file_operations ku_pir_fops =
 	.release = ku_pir_release,
 	.unlocked_ioctl = ku_pir_ioctl,
 };
+
+static dev_t dev_num;
+static struct cdev *cd_cdev;
+
+static int __init ku_pir_init(void){
+	int ret;
+
+	printk("Init Module\n");
+
+	/* Allocate character device */
+	alloc_chrdev_region(&dev_num, 0, 1, DEV_NAME);
+	cd_cdev = cdev_alloc();
+	cdev_init(cd_cdev, &ku_pir_fops);
+	ret = cdev_add(cd_cdev, dev_num, 1);
+
+	if(ret<0){
+		printk("Fail to add a character device\n");
+		return -1;
+	}
+
+	/* init list, waitqueue, spin_lock */
+//	INIT_LIST_HEAD(&kern_queues.list);
+//	init_waitqueue_head(&my_wq);
+//	spin_lock_init(&my_lock);
+
+	/* init kernel file descriptor */
+//	kern_fd=0;
+
+	/* requset GPIO and interrupt handler */
+	gpio_request_one(KUPIR_SENSOR, GPIOF_IN, "sensor");
+	irq_num = gpio_to_irq(KUPIR_SENSOR);
+//	ret = request_irq(irq_num, ku_pir_isr, IRQF_TRIGGER_FALLING|IRQF_TRIGGER_RISING, "ku_irq", NULL);
+//	if(ret){
+//		printk(KERN_ERR "Unable to request IRQ: %d\n", ret);
+//		free_irq(irq_num, NULL);
+//	}
+
+	return ret;
+}
+
+static void __exit ku_pir_exit(void){
+	struct queues *tmp;
+	struct list_head *pos = 0;
+	struct list_head *q = 0;
+
+	printk("Exit Module \n");
+
+//	list_for_each_safe(pos, q, &kern_queues.list){
+//		tmp = list_entry(pos, struct queues, list);
+//		list_del(pos);
+//		kfree(tmp);
+//	}
+
+	cdev_del(cd_cdev);
+	unregister_chrdev_region(dev_num, 1);
+
+//	disable_irq(irq_num);
+//	free_irq(irq_num, NULL);
+	gpio_free(KUPIR_SENSOR);
+}
+
+module_init(ku_pir_init);
+module_exit(ku_pir_exit);
