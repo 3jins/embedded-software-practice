@@ -27,9 +27,9 @@ int ku_pir_close(int fd) {
 
 void ku_pir_read(int fd, struct ku_pir_data *data) {
 	int dev = open("/dev/ku_pir_dev", O_RDWR);
-	struct ioctl_read_arg arg = {
-		.data = data,
+	struct ioctl_arg arg = {
 		.fd = fd,
+		.data = data,
 	};
 
 	ioctl(dev, KU_IOCTL_READ, &arg);
@@ -50,10 +50,15 @@ int ku_pir_insertData(int fd, long unsigned int ts, char rf_flag) {
 	int ret = -1;
 
 	struct ku_pir_data data = {
-
+		.timestamp = ts,
+		.rf_flag = rf_flag,
+	};
+	struct ioctl_arg arg = {
+		.fd = fd,
+		.data = &data,
 	};
 
-	ret = ioctl(dev, KU_IOCTL_INSERT, NULL);
+	ret = ioctl(dev, KU_IOCTL_INSERT, &arg);
 
 	close(dev);
 	return ret;
