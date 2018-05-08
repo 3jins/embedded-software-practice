@@ -4,48 +4,55 @@
 #include <unistd.h>
 
 int main(void) {
-	int fd = ku_pir_open();
-	struct ku_pir_data *data;
+	int fd1, fd2;
+	struct ku_pir_data data;
 	int pid;
 
 	// scenario 1 : single process
-	ku_pir_insertData(fd, 123, 1);
-	ku_pir_insertData(fd, 1234, 1);
-	ku_pir_insertData(fd, 12349, 0);
-	ku_pir_read(fd, data);
-	printf("%lu %c\n", data->timestamp, data->rf_flag);
-	ku_pir_read(fd, data);
-	printf("%lu %c\n", data->timestamp, data->rf_flag);
-	ku_pir_read(fd, data);
-	printf("%lu %c\n", data->timestamp, data->rf_flag);
-	ku_pir_close(fd);
+//	printf("Scenario1\n");
+//	fd1 = ku_pir_open();
+//	ku_pir_insertData(fd1, 123, 1);
+//	ku_pir_insertData(fd1, 1234, 1);
+//	ku_pir_insertData(fd1, 12349, 0);
+//	ku_pir_read(fd1, &data);
+//	printf("%lu %d\n", data.timestamp, data.rf_flag);
+//	ku_pir_read(fd1, &data);
+//	printf("%lu %d\n", data.timestamp, data.rf_flag);
+//	ku_pir_read(fd1, &data);
+//	printf("%lu %d\n", data.timestamp, data.rf_flag);
+//	ku_pir_close(fd1);
 
 	// scenario 2 : dual process
-//	pid = fork();
-//	if(pid == 0) {	// child
-//		ku_pir_insertData(fd, 923, 1);
-//		ku_pir_insertData(fd, 9234, 1);
-//		ku_pir_insertData(fd, 92349, 0);
-//		ku_pir_read(fd, data);
-//		printf("%lu %c\n", data->timestamp, data->rf_flag);
-//		ku_pir_read(fd, data);
-//		printf("%lu %c\n", data->timestamp, data->rf_flag);
-//		ku_pir_read(fd, data);
-//		printf("%lu %c\n", data->timestamp, data->rf_flag);
-//		ku_pir_close(fd);
-//	}
-//	else {	// parent
-//		ku_pir_insertData(fd, 123, 1);
-//		ku_pir_insertData(fd, 1234, 1);
-//		ku_pir_insertData(fd, 12349, 0);
-//		ku_pir_read(fd, data);
-//		printf("%lu %c\n", data->timestamp, data->rf_flag);
-//		ku_pir_read(fd, data);
-//		printf("%lu %c\n", data->timestamp, data->rf_flag);
-//		ku_pir_read(fd, data);
-//		printf("%lu %c\n", data->timestamp, data->rf_flag);
-//		ku_pir_close(fd);
-//	}
+	printf("Scenario2\n");
+	pid = fork();
+	if(pid == 0) {	// child
+		fd1 = ku_pir_open();
+//		ku_pir_insertData(fd1, 923, 1);
+//		ku_pir_insertData(fd1, 9234, 1);
+//		ku_pir_insertData(fd1, 92349, 0);
+//		ku_pir_read(fd1, &data);
+//		printf("%lu %d\n", data.timestamp, data.rf_flag);
+//		ku_pir_read(fd1, &data);
+//		printf("%lu %d\n", data.timestamp, data.rf_flag);
+//		ku_pir_read(fd1, &data);
+//		printf("%lu %d\n", data.timestamp, data.rf_flag);
+//		ku_pir_read(fd1, &data);
+		ku_pir_close(fd1);
+	}
+	else {	// parent
+		fd2 = ku_pir_open();
+//		ku_pir_insertData(fd2, 123, 1);
+//		ku_pir_insertData(fd2, 1234, 1);
+//		ku_pir_insertData(fd2, 12349, 0);
+//		ku_pir_read(fd2, &data);
+//		printf("%lu %d\n", data.timestamp, data.rf_flag);
+//		ku_pir_read(fd2, &data);
+//		printf("%lu %d\n", data.timestamp, data.rf_flag);
+//		ku_pir_read(fd2, &data);
+//		printf("%lu %d\n", data.timestamp, data.rf_flag);
+//		ku_pir_read(fd2, &data);
+		ku_pir_close(fd2);
+	}
 
 	return 0;
 }
