@@ -16,12 +16,13 @@
 MODULE_LICENSE("GPL");
 
 int i, j = 0;
-struct ku_pir_data kernel_data;
 struct ku_pir_data_list {
 	struct list_head list;
 	struct ku_pir_data data;
 	int fd;
 };
+static struct ku_pir_data_list data_queue_list[MAX_FD];
+char not_null_list[MAX_FD];
 
 spinlock_t ku_pir_lock;
 wait_queue_head_t ku_pir_wq;
@@ -31,8 +32,20 @@ static int irq_num;
 void init_data_queue_list(void) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 	for(i = 0; i < max_fd; i++) {
-		data_queue_list[i] = 0L;
+		//data_queue_list[i] = 0L;
+		not_null_list[i] = 0;
 	}
+}
+
+void test_print(int fd, char* flag){
+	struct ku_pir_data_list *tmp = 0;
+
+	spin_lock(&ku_pir_lock);
+	list_for_each_entry(tmp, &data_queue_list[fd].list, list){
+		if(tmp->fd < 0) continue;	// Start node
+		printk("[test in %s] fd: %d, timestamp: %lu", flag, tmp->fd, tmp->data.timestamp);
+	}
+	spin_unlock(&ku_pir_lock);
 }
 
 static int ku_pir_open(struct inode *inode, struct file* file) { return 0; }
@@ -41,41 +54,43 @@ static int ku_pir_release(struct inode *inode, struct file* file) { return 0; }
 
 int open(void) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
+
 	for(i = 0; i < max_fd; i++) {
-		if (data_queue_list[i] == 0) {
-			// init a queue
-			struct ku_pir_data_list data_list;
+		if (not_null_list[i] == 0) {
+			static struct ku_pir_data_list data_list;	// It needs to be declared STATIC. Otherwise, each node of linked list will be disappeared frequently.
+			data_list.fd = -1;
 			INIT_LIST_HEAD(&data_list.list);
 
-			spin_lock(&ku_pir_lock);	
-			data_queue_list[i] = (long)&data_list;
+			spin_lock(&ku_pir_lock);
+			data_queue_list[i] = data_list;
+			not_null_list[i] = 1;
 			spin_unlock(&ku_pir_lock);
+			printk("[open] fd: %d", i);
 			return i;
 		}
 	}
 	return -1;
 }
 
-int close(int fd) {
+int close(int *arg) {
+	int fd = -1;
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 	int ret = -1;
-	struct ku_pir_data_list *tmp = 0;
 
+	copy_from_user(&fd, arg, sizeof(int *));
+	printk("[close] fd: %d", fd);
 	spin_lock(&ku_pir_lock);
-	if(max_fd < fd || data_queue_list[fd] == 0) {
+	if(max_fd < fd || not_null_list[fd] == 0) {
 		printk("[close] There is no fd %d", fd);
 		ret = -1;
 	}
 	else {
-		spin_lock(&ku_pir_lock);
-		list_del_rcu(&((struct ku_pir_data_list *)data_queue_list[fd])->list);
-		kfree((struct ku_pir_data_list *)data_queue_list[fd]);
-		synchronize_rcu();
-		data_queue_list[fd] = 0;
-		spin_unlock(&ku_pir_lock);
+//		data_queue_list[fd] = 0;
+		not_null_list[i] = 0;
 		ret = 0;
 	}
 	spin_unlock(&ku_pir_lock);
+	printk("TEST");
 
 	return ret;
 }
@@ -86,8 +101,7 @@ int get_queue_size(struct ku_pir_data_list *data_list) {
 
 	spin_lock(&ku_pir_lock);
 	list_for_each_entry(tmp, &data_list->list, list){
-		printk("[%d] %lu", tmp->fd, tmp->data.timestamp);
-		printk("???%d", result);
+		if(tmp->fd < 0) continue;	// Start node
 		result++;
 	}
 	spin_unlock(&ku_pir_lock);
@@ -100,16 +114,13 @@ void linked_list_pop(struct ku_pir_data_list *data_list, struct ku_pir_data* pop
 	struct ku_pir_data_list *tmp = 0;
 	struct list_head *pos = 0;
 	struct list_head *q = 0;
-	int ctu_result = -1;
+	int ret = -1;
 
 	spin_lock(&ku_pir_lock);
 	list_for_each_safe(pos, q, &data_list->list){
 		tmp = list_entry(pos, struct ku_pir_data_list, list);
-		ctu_result = copy_to_user(popped_data, &tmp->data, sizeof(struct ku_pir_data));
-		if(ctu_result < 0) {
-			printk("[linked_list_pop] Failed copy_to_user");
-			return;
-		}
+		if(tmp->fd < 0) continue;	// Start node
+		ret = copy_to_user(popped_data, &tmp->data, sizeof(struct ku_pir_data));
 		list_del(pos);
 		kfree(tmp);
 		break;
@@ -121,49 +132,55 @@ void read(struct ioctl_arg *arg) {
 	int fd = arg->fd;
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
 
-	if(max_fd < fd || data_queue_list[fd] == 0) {
+	if(max_fd < fd || not_null_list[fd] == 0) {
 		printk("[read] There is no fd %d", fd);
 		return;
 	}
+	test_print(fd, "read");
 
 	printk("[read] fd %d is waiting...", fd);
-	wait_event_interruptible(ku_pir_wq, (get_queue_size((struct ku_pir_data_list *)data_queue_list[fd]) > 0));
+	get_queue_size(&data_queue_list[fd]);
+	wait_event_interruptible(ku_pir_wq, (get_queue_size(&data_queue_list[fd]) > 0));
 	printk("[read] fd %d woke up!", fd);
 
-	linked_list_pop((struct ku_pir_data_list *)data_queue_list[fd], arg->data);	
+	linked_list_pop(&data_queue_list[fd], arg->data);
 }
 
-int insertData(struct ioctl_arg *arg) {
+int insertData(struct ioctl_arg *arg_param) {
 	int max_fd = sizeof(data_queue_list) / sizeof(int);
-	//struct ioctl_arg local_arg = 
-	//int ret = copy_from_user(&data, (struct ku_pir_data *)arg, sizeof(struct ku_pir_data));		// IS IT NECESSARY?
+	struct ioctl_arg *arg = (struct ioctl_arg *)kmalloc(sizeof(struct ioctl_arg *), GFP_KERNEL);
+	int ret = copy_from_user(arg, arg_param, sizeof(struct ioctl_arg));		// IS IT NECESSARY?
 	int fd = arg->fd;
-	struct ku_pir_data data = *(arg->data);
+	struct ku_pir_data *data = arg->data;
 	struct ku_pir_data_list *data_list;
 	struct ku_pir_data_list *new_data;
 
-	if(max_fd < fd || data_queue_list[fd] == 0) {
+	struct ku_pir_data_list *tmp = 0;
+
+	if(max_fd < fd || not_null_list[fd] == 0) {
 		printk("[insertData] There is no fd %d", fd);
 		return -1;
 	}
 
-	data_list = (struct ku_pir_data_list *)data_queue_list[fd];
+	data_list = &data_queue_list[fd];
 	new_data = (struct ku_pir_data_list *)kmalloc(sizeof(struct ku_pir_data_list), GFP_KERNEL);
-	new_data->data = data;
+	new_data->data = *data;
+	new_data->fd = fd;
 
 	spin_lock(&ku_pir_lock);
 	list_add_tail(&new_data->list, &data_list->list);
 	spin_unlock(&ku_pir_lock);
+	
+	test_print(fd, "insertData");
 
 	wake_up_interruptible(&ku_pir_wq);
 
-	//	return ret;
-	return 0;
+	return ret;
 }
 
 void flush(int fd) {
 	struct ku_pir_data_list *tmp = 0;
-	struct ku_pir_data_list *data_list = (struct ku_pir_data_list *)data_queue_list[fd];
+	struct ku_pir_data_list *data_list = &data_queue_list[fd];
 	struct list_head *pos = 0;
 	struct list_head *q = 0;
 
@@ -184,13 +201,13 @@ static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			ret = open();
 			break;
 		case KU_IOCTL_CLOSE:
-			ret = close(*(int *)arg);
+			ret = close((int *)arg);
 			break;
 		case KU_IOCTL_READ:
 			read((struct ioctl_arg *) arg);
 			break;
 		case KU_IOCTL_FLUSH:
-			flush(*(int *)arg);	
+			flush((int *)arg);	
 			break;
 		case KU_IOCTL_INSERT:
 			ret = insertData((struct ioctl_arg *) arg);

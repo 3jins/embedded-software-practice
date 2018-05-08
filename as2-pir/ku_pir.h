@@ -19,7 +19,7 @@
 #define	KU_IOCTL_INSERT	_IOWR(SIMPLE_IOCTL_NUM, IOCTL_NUM5, unsigned long *)
 
 
-struct ku_pir_data {
+static struct ku_pir_data {
 	long unsigned int timestamp;
 	char rf_flag;
 };
@@ -28,5 +28,3 @@ struct ioctl_arg {
 	struct ku_pir_data *data;
 	int fd;
 };
-
-long data_queue_list[MAX_FD];
