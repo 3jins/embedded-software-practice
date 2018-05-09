@@ -30,9 +30,8 @@ wait_queue_head_t ku_pir_wq;
 static int irq_num;
 
 void init_data_queue_list(void) {
-	int max_fd = sizeof(data_queue_list) / sizeof(int);
+	int max_fd = sizeof(data_queue_list) / sizeof(struct ku_pir_data_list) - 1;
 	for(i = 0; i < max_fd; i++) {
-		//data_queue_list[i] = 0L;
 		not_null_list[i] = 0;
 	}
 }
@@ -41,6 +40,8 @@ void test_print(int fd, char* flag){
 	struct ku_pir_data_list *tmp = 0;
 
 	spin_lock(&ku_pir_lock);
+	printk("[test in %s] Printing all data in the queue", flag);
+
 	list_for_each_entry(tmp, &data_queue_list[fd].list, list){
 		if(tmp->fd < 0) continue;	// Start node
 		printk("[test in %s] fd: %d, timestamp: %lu", flag, tmp->fd, tmp->data.timestamp);
@@ -48,18 +49,20 @@ void test_print(int fd, char* flag){
 	spin_unlock(&ku_pir_lock);
 }
 
-static int ku_pir_open(struct inode *inode, struct file* file) { return 0; }
-
-static int ku_pir_release(struct inode *inode, struct file* file) { return 0; }
-
 int open(void) {
-	int max_fd = sizeof(data_queue_list) / sizeof(int);
+	int max_fd = sizeof(data_queue_list) / sizeof(struct ku_pir_data_list) - 1;
 
 	for(i = 0; i < max_fd; i++) {
 		if (not_null_list[i] == 0) {
 			static struct ku_pir_data_list data_list;	// It needs to be declared STATIC. Otherwise, each node of linked list will be disappeared frequently.
 			data_list.fd = -1;
 			INIT_LIST_HEAD(&data_list.list);
+//			printk("%d", &data_list);
+//			printk("%d", data_list);
+//			printk("%d", &data_list.list);
+//			printk("%d", data_list.list);
+//			printk("%d", data_list.list.next);
+//			printk("%d", *data_list.list.next);
 
 			spin_lock(&ku_pir_lock);
 			data_queue_list[i] = data_list;
@@ -72,12 +75,11 @@ int open(void) {
 	return -1;
 }
 
-int close(int *arg) {
-	int fd = -1;
-	int max_fd = sizeof(data_queue_list) / sizeof(int);
+int close(int *fd_param) {
+	int fd = *fd_param;
+	int max_fd = sizeof(data_queue_list) / sizeof(struct ku_pir_data_list) - 1;
 	int ret = -1;
 
-	copy_from_user(&fd, arg, sizeof(int *));
 	printk("[close] fd: %d", fd);
 	spin_lock(&ku_pir_lock);
 	if(max_fd < fd || not_null_list[fd] == 0) {
@@ -85,12 +87,10 @@ int close(int *arg) {
 		ret = -1;
 	}
 	else {
-//		data_queue_list[fd] = 0;
 		not_null_list[i] = 0;
 		ret = 0;
 	}
 	spin_unlock(&ku_pir_lock);
-	printk("TEST");
 
 	return ret;
 }
@@ -101,6 +101,7 @@ int get_queue_size(struct ku_pir_data_list *data_list) {
 
 	spin_lock(&ku_pir_lock);
 	list_for_each_entry(tmp, &data_list->list, list){
+		printk("<<%d>>", tmp->fd);
 		if(tmp->fd < 0) continue;	// Start node
 		result++;
 	}
@@ -130,33 +131,35 @@ void linked_list_pop(struct ku_pir_data_list *data_list, struct ku_pir_data* pop
 
 void read(struct ioctl_arg *arg) {
 	int fd = arg->fd;
-	int max_fd = sizeof(data_queue_list) / sizeof(int);
-
+	int max_fd = sizeof(data_queue_list) / sizeof(struct ku_pir_data_list) - 1;
+	
 	if(max_fd < fd || not_null_list[fd] == 0) {
 		printk("[read] There is no fd %d", fd);
 		return;
 	}
-	test_print(fd, "read");
+//	test_print(fd, "read");
 
 	printk("[read] fd %d is waiting...", fd);
-	get_queue_size(&data_queue_list[fd]);
-	wait_event_interruptible(ku_pir_wq, (get_queue_size(&data_queue_list[fd]) > 0));
+	wait_event_interruptible(ku_pir_wq, (list_empty(&data_queue_list[fd].list) > 0));
+//	get_queue_size(&data_queue_list[fd]);
+//	wait_event_interruptible(ku_pir_wq, (get_queue_size(&data_queue_list[fd]) > 0));
 	printk("[read] fd %d woke up!", fd);
 
-	linked_list_pop(&data_queue_list[fd], arg->data);
+	if(!list_empty(&data_queue_list[fd].list)) {
+		linked_list_pop(&data_queue_list[fd], arg->data);
+	}
 }
 
 int insertData(struct ioctl_arg *arg_param) {
-	int max_fd = sizeof(data_queue_list) / sizeof(int);
+	int max_fd = sizeof(data_queue_list) / sizeof(struct ku_pir_data_list) - 1;
 	struct ioctl_arg *arg = (struct ioctl_arg *)kmalloc(sizeof(struct ioctl_arg *), GFP_KERNEL);
-	int ret = copy_from_user(arg, arg_param, sizeof(struct ioctl_arg));		// IS IT NECESSARY?
+	int ret = copy_from_user(arg, arg_param, sizeof(struct ioctl_arg));	
 	int fd = arg->fd;
 	struct ku_pir_data *data = arg->data;
 	struct ku_pir_data_list *data_list;
 	struct ku_pir_data_list *new_data;
 
-	struct ku_pir_data_list *tmp = 0;
-
+	printk("[insertData] fd: %d", fd);
 	if(max_fd < fd || not_null_list[fd] == 0) {
 		printk("[insertData] There is no fd %d", fd);
 		return -1;
@@ -178,9 +181,9 @@ int insertData(struct ioctl_arg *arg_param) {
 	return ret;
 }
 
-void flush(int fd) {
+void flush(int *fd) {
 	struct ku_pir_data_list *tmp = 0;
-	struct ku_pir_data_list *data_list = &data_queue_list[fd];
+	struct ku_pir_data_list *data_list = &data_queue_list[*fd];
 	struct list_head *pos = 0;
 	struct list_head *q = 0;
 
@@ -219,12 +222,41 @@ static long ku_pir_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return ret;
 };
 
+static int ku_pir_open(struct inode *inode, struct file* file) { return 0; }
+
+static int ku_pir_release(struct inode *inode, struct file* file) { return 0; }
+
 struct file_operations ku_pir_fops =
 {
 	.open = ku_pir_open,
 	.release = ku_pir_release,
 	.unlocked_ioctl = ku_pir_ioctl,
 };
+
+/* ISR: It handles interrupts arisen by a pir sensor */
+static irqreturn_t ku_pir_isr(int irq, void *dev_id) {
+	struct ku_pir_data data;
+	int max_fd = sizeof(data_queue_list) / sizeof(struct ku_pir_data_list) - 1;
+
+	data.timestamp = jiffies;
+	if(gpio_get_value(KUPIR_SENSOR) == IRQF_TRIGGER_RISING) {
+		data.rf_flag = '0';
+	}
+	else {
+		data.rf_flag = '1';
+	}
+
+	for(i=0; i<max_fd; i++) {
+		struct ioctl_arg arg = {
+			.data = &data,
+			.fd = i,
+		};
+		insertData(&arg);
+	}
+
+	return IRQ_HANDLED;
+}
+
 
 static dev_t dev_num;
 static struct cdev *cd_cdev;
@@ -233,9 +265,6 @@ static int __init ku_pir_init(void){
 	int ret;
 
 	printk("Init Module\n");
-
-	/* Initialize data_queue_list */
-	init_data_queue_list();
 
 	/* Allocate character device */
 	alloc_chrdev_region(&dev_num, 0, 1, DEV_NAME);
@@ -248,44 +277,34 @@ static int __init ku_pir_init(void){
 		return -1;
 	}
 
-	/* init list, waitqueue, spin_lock */
-	//	INIT_LIST_HEAD(&kern_queues.list);
+	/* init list(array), waitqueue, spin_lock */
+	init_data_queue_list();
 	init_waitqueue_head(&ku_pir_wq);
 	spin_lock_init(&ku_pir_lock);
-
-	/* init kernel file descriptor */
-	//	kern_fd=0;
 
 	/* requset GPIO and interrupt handler */
 	gpio_request_one(KUPIR_SENSOR, GPIOF_IN, "sensor");
 	irq_num = gpio_to_irq(KUPIR_SENSOR);
-	//	ret = request_irq(irq_num, ku_pir_isr, IRQF_TRIGGER_FALLING|IRQF_TRIGGER_RISING, "ku_irq", NULL);
-	//	if(ret){
-	//		printk(KERN_ERR "Unable to request IRQ: %d\n", ret);
-	//		free_irq(irq_num, NULL);
-	//	}
+	ret = request_irq(irq_num, ku_pir_isr, IRQF_TRIGGER_FALLING|IRQF_TRIGGER_RISING, "ku_pir_irq", NULL);
+	if(ret){
+		printk(KERN_ERR "Unable to request IRQ: %d\n", ret);
+		free_irq(irq_num, NULL);
+	}
+	else {
+		disable_irq(irq_num);
+	}
 
-	return ret;
+	return 0;
 }
 
 static void __exit ku_pir_exit(void){
-	struct queues *tmp;
-	struct list_head *pos = 0;
-	struct list_head *q = 0;
-
 	printk("Exit Module\n");
-
-	//	list_for_each_safe(pos, q, &kern_queues.list){
-	//		tmp = list_entry(pos, struct queues, list);
-	//		list_del(pos);
-	//		kfree(tmp);
-	//	}
 
 	cdev_del(cd_cdev);
 	unregister_chrdev_region(dev_num, 1);
 
-	//	disable_irq(irq_num);
-	//	free_irq(irq_num, NULL);
+	disable_irq(irq_num);
+	free_irq(irq_num, NULL);
 	gpio_free(KUPIR_SENSOR);
 }
 

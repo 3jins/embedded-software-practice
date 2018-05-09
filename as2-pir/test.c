@@ -30,7 +30,7 @@ int main(void) {
 //		ku_pir_insertData(fd1, 923, 1);
 //		ku_pir_insertData(fd1, 9234, 1);
 //		ku_pir_insertData(fd1, 92349, 0);
-//		ku_pir_read(fd1, &data);
+		ku_pir_read(fd1, &data);
 //		printf("%lu %d\n", data.timestamp, data.rf_flag);
 //		ku_pir_read(fd1, &data);
 //		printf("%lu %d\n", data.timestamp, data.rf_flag);
